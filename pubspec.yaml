@@ -1,7 +1,9 @@
 name: cellular_info
 description: "A Flutter plugin that provides access to 5G NR (New Radio) information on Android devices using TelephonyManager.requestCellInfoUpdate(). Delivers real-time cell info through a Dart Stream."
 version: 1.0.0
-homepage: https://github.com/adojayfan/cellular_info
+homepage: https://github.com/adojayfan/cellular_info 
+repository: https://github.com/brislor/cellular_info
+issue_tracker: https://github.com/brislor/cellular_info/issues
 
 environment:
   sdk: ^3.5.4
