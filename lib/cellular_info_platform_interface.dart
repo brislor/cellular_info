@@ -24,20 +24,24 @@ abstract class CellularInfoPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<String?> getPlatformVersion() {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+  Future<List<SignalNr>> getCellInfo() {
+    throw UnimplementedError('getCellInfo() has not been implemented.');
   }
 
   Future<List<SignalNr>> getNrCellInfo() {
-    throw UnimplementedError('platformVersion() has not been implemented.');
+    throw UnimplementedError('getNrCellInfo() has not been implemented.');
+  }
+
+  Stream<List<SignalNr>> get allCellInfoStream {
+    throw UnimplementedError('nrOrLteSignalStream() has not been implemented.');
   }
 
   Stream<List<SignalNr>> get nrSignalStream {
-    throw UnimplementedError('getSignalNr() has not been implemented.');
+    throw UnimplementedError('nrSignalStream() has not been implemented.');
   }
 
   Stream<List<SignalNr>> get nrSignalStreamFromService {
-    throw UnimplementedError('getSignalNr() has not been implemented.');
+    throw UnimplementedError('nrSignalStreamFromService() has not been implemented.');
   }
 
   Future<void> startService() async {

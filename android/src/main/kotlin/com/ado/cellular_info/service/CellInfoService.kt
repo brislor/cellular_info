@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfo
+import android.telephony.CellInfoLte
 import android.telephony.CellInfoNr
 import android.telephony.CellSignalStrengthNr
 import android.telephony.TelephonyManager
@@ -20,6 +21,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.ado.cellular_info.CellularEventSink
 import com.ado.cellular_info.model.CellInfoModel
+import com.ado.cellular_info.model.CellInfoType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -84,40 +86,102 @@ class CellInfoService : Service() {
     private fun parseNrData(cellInfo: List<CellInfo>): List<Map<String,Any>> {
         val nrList = cellInfo.filterIsInstance<CellInfoNr>()
         if (nrList.isNotEmpty()) {
-            val mapList = nrList.map {
-                val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
-                val cellIdentityNr = it.cellIdentity as CellIdentityNr
-
-                val arfcn = cellIdentityNr.nrarfcn
-                val rsrp = strengthNr.ssRsrp
-                val rsrq = strengthNr.ssRsrq
-                val sinr = strengthNr.ssSinr
-                val csiRsrp = strengthNr.csiRsrp
-                val csiRsrq = strengthNr.csiRsrq
-                val csiSnr = strengthNr.csiSinr
-                val dbm = strengthNr.dbm
-                CellInfoModel(
-//                                band = convert2Band(
-//                                    NrTools.getNrBandForArfcn(
-//                                        arfcn,
-//                                        context = context
-//                                    )
-//                                ),
-                    arfcn = arfcn,
-//                                freq = NrTools.nrArfcnToFrequency(arfcn),
-                    rsrq,
-                    rsrp,
-                    sinr,
-                    csiRsrp = csiRsrp,
-                    csiRsrq = csiRsrq,
-                    csiSinr = csiSnr,
-                    dbm = dbm
-                ).toMap()
-            }
+//            val mapList = nrList.map {
+//                val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
+//                val cellIdentityNr = it.cellIdentity as CellIdentityNr
+//
+//                val arfcn = cellIdentityNr.nrarfcn
+//                val rsrp = strengthNr.ssRsrp
+//                val rsrq = strengthNr.ssRsrq
+//                val sinr = strengthNr.ssSinr
+//                val csiRsrp = strengthNr.csiRsrp
+//                val csiRsrq = strengthNr.csiRsrq
+//                val csiSnr = strengthNr.csiSinr
+//                val dbm = strengthNr.dbm
+//                CellInfoModel(
+////                                band = convert2Band(
+////                                    NrTools.getNrBandForArfcn(
+////                                        arfcn,
+////                                        context = context
+////                                    )
+////                                ),
+//                    arfcn = arfcn,
+////                                freq = NrTools.nrArfcnToFrequency(arfcn),
+//                    rsrq,
+//                    rsrp,
+//                    sinr,
+//                    csiRsrp = csiRsrp,
+//                    csiRsrq = csiRsrq,
+//                    csiSinr = csiSnr,
+//                    dbm = dbm
+//                ).toMap()
+//            }
+            val mapList = getCellInfoMap(nrList)
             return mapList
         }else{
             return listOf()
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun getCellInfoMap(cellInfoList: List<CellInfo>):List<Map<String,Any>>{
+        val mapList = cellInfoList.map {
+            when(it){
+                is CellInfoNr -> {
+                    val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
+                    val cellIdentityNr = it.cellIdentity as CellIdentityNr
+
+                    val arfcn = cellIdentityNr.nrarfcn
+                    val pci = cellIdentityNr.pci
+                    val rsrp = strengthNr.ssRsrp
+                    val rsrq = strengthNr.ssRsrq
+                    val sinr = strengthNr.ssSinr
+                    val csiRsrp = strengthNr.csiRsrp
+                    val csiRsrq = strengthNr.csiRsrq
+                    val csiSnr = strengthNr.csiSinr
+                    val dbm = strengthNr.dbm
+                    CellInfoModel(
+                        type = CellInfoType.Nr,
+                        isRegistered = it.isRegistered,
+                        arfcn = arfcn,
+                        pci,
+                        rsrq,
+                        rsrp,
+                        sinr,
+                        csiRsrp = csiRsrp,
+                        csiRsrq = csiRsrq,
+                        csiSinr = csiSnr,
+                        dbm = dbm
+                    ).toMap()
+                }
+                is CellInfoLte ->{
+                    val strengthNr = it.cellSignalStrength
+                    val cellIdentityNr = it.cellIdentity
+
+                    val arfcn = cellIdentityNr.earfcn
+                    val pci = cellIdentityNr.pci
+                    val rsrp = strengthNr.rsrp
+                    val rsrq = strengthNr.rsrq
+                    val sinr = strengthNr.rssnr
+                    val dbm = strengthNr.dbm
+                    CellInfoModel(
+                        type = CellInfoType.Lte,
+                        isRegistered = it.isRegistered,
+                        arfcn = arfcn,
+                        pci,
+                        rsrq,
+                        rsrp,
+                        sinr,
+                        dbm = dbm,
+                    ).toMap()
+                }
+                else->{
+                    // Impossible: 3g or 2g.
+                    CellInfoModel(type = CellInfoType.Nr, isRegistered = false,arfcn = 0, pci = 0, ssRsrp = 0, ssRsrq = 0, ssSnr = 0, dbm = 0).toMap()
+                }
+            }
+        }
+        return mapList
     }
 
     private fun createNotificationChannel() {

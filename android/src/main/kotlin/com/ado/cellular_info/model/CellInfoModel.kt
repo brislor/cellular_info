@@ -1,22 +1,31 @@
 package com.ado.cellular_info.model
 
+enum class CellInfoType{
+    Nr,Lte;
+}
 data class CellInfoModel(
 //    val band: String,
+    val type: CellInfoType,
+    val isRegistered: Boolean,
     val arfcn: Int,
 //    val freq: Double,
+    val pci: Int,
     val ssRsrq: Int,
     val ssRsrp: Int,
     val ssSnr: Int,
-    val csiRsrq: Int,
-    val csiRsrp: Int,
-    val csiSinr: Int,
+    val csiRsrq: Int = 0,
+    val csiRsrp: Int = 0,
+    val csiSinr: Int = 0,
     val dbm: Int
 ) {
     fun toMap(): Map<String, Any> {
         return mapOf(
+            "type" to type.ordinal,
+            "isRegistered" to isRegistered,
 //            "band" to band,
             "arfcn" to arfcn,
 //            "freq" to freq,
+            "pci" to pci,
             "ssRsrq" to ssRsrq,
             "ssRsrp" to ssRsrp,
             "ssSinr" to ssSnr,

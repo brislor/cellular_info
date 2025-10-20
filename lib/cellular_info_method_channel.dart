@@ -15,16 +15,21 @@ class MethodChannelCellularInfo extends CellularInfoPlatform {
   final methodChannel = const MethodChannel('cellular_info');
 
   @visibleForTesting
-  final eventChannel = const EventChannel('cellular_info_event');
+  final nrEventChannel = const EventChannel('cellular_info_nr_stream');
+
+  @visibleForTesting
+  final allCellInfoEventChannel = const EventChannel('cellular_info_all_cell_stream');
 
   @visibleForTesting
   final serviceEventChannel = const EventChannel('cellular_info_event_service');
 
   @override
-  Future<String?> getPlatformVersion() async {
-    final version =
-        await methodChannel.invokeMethod<String>('getPlatformVersion');
-    return version;
+  Future<List<SignalNr>> getCellInfo() async {
+    final list = await methodChannel.invokeListMethod("getCellInfo");
+    return list?.map((e) {
+      return SignalNr.fromJson(Map<String, dynamic>.from(e as Map));
+    }).toList() ??
+        [];
   }
 
   @override
@@ -37,8 +42,27 @@ class MethodChannelCellularInfo extends CellularInfoPlatform {
   }
 
   @override
+  Stream<List<SignalNr>> get allCellInfoStream{
+    return allCellInfoEventChannel.receiveBroadcastStream().asyncMap((event) async {
+      final rawList = event as List<dynamic>;
+      final signals = await Future.wait(rawList.map((e) async {
+        var signalNr = SignalNr.fromJson(Map<String, dynamic>.from(e));
+        if (signalNr.arfcn != null) {
+          signalNr.freq = nrArfcnToFrequency(signalNr.arfcn!);
+          signalNr.band =
+              convert2Band(await getNrBandForArfcn(signalNr.arfcn!));
+        }
+        return signalNr;
+      }));
+      return signals;
+    }).handleError((error) {
+      throw Exception("allCellInfoStream...$error");
+    });
+  }
+
+  @override
   Stream<List<SignalNr>> get nrSignalStream {
-    return eventChannel.receiveBroadcastStream().asyncMap((event) async {
+    return nrEventChannel.receiveBroadcastStream().asyncMap((event) async {
       final rawList = event as List<dynamic>;
       final signals = await Future.wait(rawList.map((e) async {
         var signalNr = SignalNr.fromJson(Map<String, dynamic>.from(e));

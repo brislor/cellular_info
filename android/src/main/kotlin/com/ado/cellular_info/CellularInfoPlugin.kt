@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfo
+import android.telephony.CellInfoLte
 import android.telephony.CellInfoNr
 import android.telephony.CellSignalStrengthNr
 import android.telephony.TelephonyManager
@@ -17,6 +18,7 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.ado.cellular_info.model.CellInfoModel
+import com.ado.cellular_info.model.CellInfoType
 import com.ado.cellular_info.service.CellInfoService
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
@@ -36,14 +38,18 @@ import java.util.TimerTask
 class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
     private val tag = "CellularInfoPlugin"
     private val testUrl = "https://www.google.com"
-//    private val testUrl = "https://www.baidu.com"
-    private val timeInternal = 2000
+
+    //    private val testUrl = "https://www.baidu.com"
+    private val timeInternal = 1000
     private lateinit var context: Context
     private lateinit var methodChannel: MethodChannel
-    private lateinit var normalEventChannel: EventChannel
+    private lateinit var nrEventChannel: EventChannel
+    private lateinit var allInfoEventChannel: EventChannel
     private lateinit var serviceEventChannel: EventChannel
-    private var normalEventSink: EventChannel.EventSink? = null
-    private var timer:Timer? = null
+    private var nrStreamEventSink: EventChannel.EventSink? = null
+    private var allCellInfoStreamEventSink: EventChannel.EventSink? = null
+    private var nrTimer: Timer? = null
+    private var allCellInfoTimer: Timer? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         Log.i(tag, "Init Plugin")
@@ -51,20 +57,38 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
         methodChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "cellular_info")
         methodChannel.setMethodCallHandler(this)
 
-        normalEventChannel = EventChannel(flutterPluginBinding.binaryMessenger, "cellular_info_event")
-        normalEventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+        allInfoEventChannel =
+            EventChannel(flutterPluginBinding.binaryMessenger, "cellular_info_all_cell_stream")
+        allInfoEventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                Log.i(tag, "all cell event stream onListen: ")
+                allCellInfoStreamEventSink = events
+                startAllInfoTimer()
+            }
+
+            override fun onCancel(arguments: Any?) {
+                Log.i(tag, "all cell event stream onCancel: ")
+                stopAllInfoTimer()
+                allCellInfoStreamEventSink = null
+            }
+        })
+
+        nrEventChannel =
+            EventChannel(flutterPluginBinding.binaryMessenger, "cellular_info_nr_stream")
+        nrEventChannel.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                 Log.i(tag, "event stream onListen: ")
-                normalEventSink = events
-                startTimer()
+                nrStreamEventSink = events
+                startNrInfoTimer()
             }
 
             override fun onCancel(arguments: Any?) {
                 Log.i(tag, "event stream onCancel: ")
-                stopTimer()
-                normalEventSink = null
+                stopNrTimer()
+                nrStreamEventSink = null
             }
         })
+
         serviceEventChannel =
             EventChannel(flutterPluginBinding.binaryMessenger, "cellular_info_event_service")
         serviceEventChannel.setStreamHandler(object : EventChannel.StreamHandler {
@@ -80,41 +104,65 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
+            "getCellInfo" -> getNrCellInfo(result)
             "getNrCellInfo" -> getNrCellInfo(result)
             "startService" -> startBackgroundService(result)
             "stopService" -> stopBackgroundService(result)
-            "getPlatformVersion" -> result.success("Android ${Build.VERSION.RELEASE}")
             else -> result.notImplemented()
         }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         methodChannel.setMethodCallHandler(null)
-        normalEventChannel.setStreamHandler(null)
+        nrEventChannel.setStreamHandler(null)
+        allInfoEventChannel.setStreamHandler(null)
         serviceEventChannel.setStreamHandler(null)
     }
 
-    private fun startTimer(){
-        timer?.cancel()
-        timer = Timer()
+    private fun startAllInfoTimer() {
+        allCellInfoTimer?.cancel()
+        allCellInfoTimer = Timer()
         val handler = Handler(Looper.getMainLooper())
-        timer?.schedule(object : TimerTask(){
+        allCellInfoTimer?.schedule(object : TimerTask() {
             override fun run() {
                 handler.post {
                     CoroutineScope(Dispatchers.IO).launch {
                         val result = httpTest(testUrl)
                         Log.d(tag, "Http send result: $result")
                     }
-                    getNrCellInfo()
+                    getAllCellInfoStream()
                 }
             }
-        },0,timeInternal.toLong())
+        }, 0, timeInternal.toLong())
     }
 
-    private fun stopTimer(){
-        Log.d(tag, "stopTimer")
-        timer?.cancel()
-        timer = null
+    private fun startNrInfoTimer() {
+        nrTimer?.cancel()
+        nrTimer = Timer()
+        val handler = Handler(Looper.getMainLooper())
+        nrTimer?.schedule(object : TimerTask() {
+            override fun run() {
+                handler.post {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val result = httpTest(testUrl)
+                        Log.d(tag, "Http send result: $result")
+                    }
+                    getNrCellInfoStream()
+                }
+            }
+        }, 0, timeInternal.toLong())
+    }
+
+    private fun stopNrTimer() {
+        Log.d(tag, "stopNrTimer")
+        nrTimer?.cancel()
+        nrTimer = null
+    }
+
+    private fun stopAllInfoTimer() {
+        Log.d(tag, "stopAllInfoTimer")
+        allCellInfoTimer?.cancel()
+        allCellInfoTimer = null
     }
 
     private fun httpTest(url: String): String? {
@@ -133,9 +181,9 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun getNrCellInfo(){
+    private fun getNrCellInfoStream() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            normalEventSink?.error("SYSTEM UNSUPPORTED","5G NR requires Android 11+",null)
+            nrStreamEventSink?.error("SYSTEM UNSUPPORTED", "5G NR requires Android 11+", null)
             return
         }
 
@@ -149,11 +197,19 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
             context, Manifest.permission.READ_PHONE_STATE
         )
         if (fineLocationPermission != PackageManager.PERMISSION_GRANTED || coarseLocationPermission != PackageManager.PERMISSION_GRANTED) {
-            normalEventSink?.error("Missing permissions", "location permission not allowed.", null)
+            nrStreamEventSink?.error(
+                "Missing permissions",
+                "location permission not allowed.",
+                null
+            )
             return
         }
         if (phoneStatePermission != PackageManager.PERMISSION_GRANTED) {
-            normalEventSink?.error("Missing permissions", "READ_PHONE_STATE permission not allowed.", null)
+            nrStreamEventSink?.error(
+                "Missing permissions",
+                "READ_PHONE_STATE permission not allowed.",
+                null
+            )
             return
         }
         val telephonyManager =
@@ -161,45 +217,180 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
         telephonyManager.requestCellInfoUpdate(
             context.mainExecutor,
             @RequiresApi(Build.VERSION_CODES.Q)
-            object : TelephonyManager.CellInfoCallback(){
+            object : TelephonyManager.CellInfoCallback() {
                 override fun onCellInfo(cellInfoList: List<CellInfo>) {
-                    val nrList = cellInfoList.filterIsInstance<CellInfoNr>()
-                    if (nrList.isNotEmpty()) {
-                        val mapList = nrList.map {
-                            val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
-                            val cellIdentityNr = it.cellIdentity as CellIdentityNr
-
-                            val arfcn = cellIdentityNr.nrarfcn
-                            val rsrp = strengthNr.ssRsrp
-                            val rsrq = strengthNr.ssRsrq
-                            val sinr = strengthNr.ssSinr
-                            val csiRsrp = strengthNr.csiRsrp
-                            val csiRsrq = strengthNr.csiRsrq
-                            val csiSnr = strengthNr.csiSinr
-                            val dbm = strengthNr.dbm
-                            CellInfoModel(
-                                arfcn = arfcn,
-                                rsrq,
-                                rsrp,
-                                sinr,
-                                csiRsrp = csiRsrp,
-                                csiRsrq = csiRsrq,
-                                csiSinr = csiSnr,
-                                dbm = dbm
-                            ).toMap()
-                        }
-                        normalEventSink?.success(mapList)
+                    val filters = cellInfoList.filter { it is CellInfoNr }
+//                    val nrList = cellInfoList.filterIsInstance<CellInfoNr>()
+                    if (filters.isEmpty()) {
+                        nrStreamEventSink?.error("NOT_FOUND", "No 5G NR cell info available", null)
                         return
                     }
-                    normalEventSink?.error("NOT_FOUND", "No 5G NR cell info available", null)
+//                    val mapList = filters.map {
+//                        when(it){
+//                            is CellInfoNr -> {
+//                                val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
+//                                val cellIdentityNr = it.cellIdentity as CellIdentityNr
+//
+//                                val arfcn = cellIdentityNr.nrarfcn
+//                                val pci = cellIdentityNr.pci
+//                                val rsrp = strengthNr.ssRsrp
+//                                val rsrq = strengthNr.ssRsrq
+//                                val sinr = strengthNr.ssSinr
+//                                val csiRsrp = strengthNr.csiRsrp
+//                                val csiRsrq = strengthNr.csiRsrq
+//                                val csiSnr = strengthNr.csiSinr
+//                                val dbm = strengthNr.dbm
+//                                CellInfoModel(
+//                                    arfcn = arfcn,
+//                                    pci,
+//                                    rsrq,
+//                                    rsrp,
+//                                    sinr,
+//                                    csiRsrp = csiRsrp,
+//                                    csiRsrq = csiRsrq,
+//                                    csiSinr = csiSnr,
+//                                    dbm = dbm
+//                                ).toMap()
+//                            }
+//                            is CellInfoLte ->{
+//                                val strengthNr = it.cellSignalStrength
+//                                val cellIdentityNr = it.cellIdentity
+//
+//                                val arfcn = cellIdentityNr.earfcn
+//                                val pci = cellIdentityNr.pci
+//                                val rsrp = strengthNr.rsrp
+//                                val rsrq = strengthNr.rsrq
+//                                val sinr = strengthNr.rssnr
+//                                val dbm = strengthNr.dbm
+//                                CellInfoModel(
+//                                    arfcn = arfcn,
+//                                    pci,
+//                                    rsrq,
+//                                    rsrp,
+//                                    sinr,
+//                                    dbm = dbm,
+//                                ).toMap()
+//                            }
+//                            else->{
+//                                // Impossible: 3g or 2g.
+//                                CellInfoModel(arfcn = 0, pci = 0, ssRsrp = 0, ssRsrq = 0, ssSnr = 0, dbm = 0).toMap()
+//                            }
+//                        }
+//                    }
+                    val mapList = getCellInfoMap(filters)
+                    nrStreamEventSink?.success(mapList)
                 }
 
 
                 override fun onError(errorCode: Int, detail: Throwable?) {
-                    normalEventSink?.error("GEt_CELL_INFO_ ERROR", detail?.message,null)
+                    nrStreamEventSink?.error(
+                        "GEt_CELL_INFO_ ERROR",
+                        "Code=$errorCode, message=${detail?.message}",
+                        null
+                    )
                 }
             }
         )
+    }
+
+    private fun getAllCellInfoStream() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            allCellInfoStreamEventSink?.error("SYSTEM UNSUPPORTED", "5G NR requires Android 11+", null)
+            return
+        }
+
+        val fineLocationPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        )
+        val coarseLocationPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        val phoneStatePermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_PHONE_STATE
+        )
+        if (fineLocationPermission != PackageManager.PERMISSION_GRANTED || coarseLocationPermission != PackageManager.PERMISSION_GRANTED) {
+            allCellInfoStreamEventSink?.error(
+                "Missing permissions",
+                "location permission not allowed.",
+                null
+            )
+            return
+        }
+        if (phoneStatePermission != PackageManager.PERMISSION_GRANTED) {
+            allCellInfoStreamEventSink?.error(
+                "Missing permissions",
+                "READ_PHONE_STATE permission not allowed.",
+                null
+            )
+            return
+        }
+        val telephonyManager =
+            context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        telephonyManager.requestCellInfoUpdate(
+            context.mainExecutor,
+            @RequiresApi(Build.VERSION_CODES.Q)
+            object : TelephonyManager.CellInfoCallback() {
+                override fun onCellInfo(cellInfoList: List<CellInfo>) {
+                    val filters = cellInfoList.filter { it is CellInfoLte || it is CellInfoNr }
+                    if (filters.isEmpty()) {
+                        allCellInfoStreamEventSink?.error(
+                            "NOT_FOUND",
+                            "No 5G NR Or LTE cell info available",
+                            null
+                        )
+                        return
+                    }
+                    val mapList = getCellInfoMap(filters)
+                    nrStreamEventSink?.success(mapList)
+                }
+
+                override fun onError(errorCode: Int, detail: Throwable?) {
+                    allCellInfoStreamEventSink?.error(
+                        "GEt_CELL_INFO_ERROR",
+                        "Code=$errorCode, message=${detail?.message}",
+                        null
+                    )
+                }
+            }
+        )
+    }
+
+
+    private fun getCellInfo(result: Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            result.error("SYSTEM UNSUPPORTED", "5G NR requires Android 11+", null)
+            return
+        }
+
+        val fineLocationPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        )
+        val coarseLocationPermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+        val phoneStatePermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.READ_PHONE_STATE
+        )
+        if (fineLocationPermission != PackageManager.PERMISSION_GRANTED || coarseLocationPermission != PackageManager.PERMISSION_GRANTED) {
+            result.error("Missing permissions", "location permission not allowed.", null)
+            return
+        }
+        if (phoneStatePermission != PackageManager.PERMISSION_GRANTED) {
+            result.error("Missing permissions", "READ_PHONE_STATE permission not allowed.", null)
+            return
+        }
+
+        val telephonyManager =
+            context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        val cellInfoList = telephonyManager.allCellInfo ?: emptyList()
+
+        val filters = cellInfoList.filter { it is CellInfoLte || it is CellInfoNr }
+        if (filters.isEmpty()) {
+            result.error("NOT_FOUND", "No 5G NR OR LTE cell info available", null)
+            return
+        }
+        val mapList = getCellInfoMap(filters)
+        result.success(mapList)
     }
 
     private fun getNrCellInfo(result: Result) {
@@ -229,42 +420,138 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
         val telephonyManager =
             context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
         val cellInfoList = telephonyManager.allCellInfo ?: emptyList()
-        val nrList = cellInfoList.filterIsInstance<CellInfoNr>()
-        if (nrList.isNotEmpty()) {
-            val mapList = nrList.map {
-                val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
-                val cellIdentityNr = it.cellIdentity as CellIdentityNr
 
-                val arfcn = cellIdentityNr.nrarfcn
-                val rsrp = strengthNr.ssRsrp
-                val rsrq = strengthNr.ssRsrq
-                val snr = strengthNr.ssSinr
-                val csiRsrp = strengthNr.csiRsrp
-                val csiRsrq = strengthNr.csiRsrq
-                val csiSnr = strengthNr.csiSinr
-                val dbm = strengthNr.dbm
-                CellInfoModel(
-//                                band = convert2Band(
-//                                    NrTools.getNrBandForArfcn(
-//                                        arfcn,
-//                                        context = context
-//                                    )
-//                                ),
-                    arfcn = arfcn,
-//                                freq = NrTools.nrArfcnToFrequency(arfcn),
-                    rsrq,
-                    rsrp,
-                    snr,
-                    csiRsrp = csiRsrp,
-                    csiRsrq = csiRsrq,
-                    csiSinr = csiSnr,
-                    dbm = dbm
-                ).toMap()
-            }
-            result.success(mapList)
+        val filters = cellInfoList.filter { it is CellInfoNr }
+        if (filters.isEmpty()) {
+            result.error("NOT_FOUND", "No 5G NR cell info available", null)
             return
         }
-        result.error("NOT_FOUND", "No 5G NR cell info available", null)
+//        val mapList = filters.map {
+//            when(it){
+//                is CellInfoNr -> {
+//                    val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
+//                    val cellIdentityNr = it.cellIdentity as CellIdentityNr
+//
+//                    val arfcn = cellIdentityNr.nrarfcn
+//                    val pci = cellIdentityNr.pci
+//                    val rsrp = strengthNr.ssRsrp
+//                    val rsrq = strengthNr.ssRsrq
+//                    val sinr = strengthNr.ssSinr
+//                    val csiRsrp = strengthNr.csiRsrp
+//                    val csiRsrq = strengthNr.csiRsrq
+//                    val csiSnr = strengthNr.csiSinr
+//                    val dbm = strengthNr.dbm
+//                    CellInfoModel(
+//                        arfcn = arfcn,
+//                        pci,
+//                        rsrq,
+//                        rsrp,
+//                        sinr,
+//                        csiRsrp = csiRsrp,
+//                        csiRsrq = csiRsrq,
+//                        csiSinr = csiSnr,
+//                        dbm = dbm
+//                    ).toMap()
+//                }
+//                is CellInfoLte ->{
+//                    val strengthNr = it.cellSignalStrength
+//                    val cellIdentityNr = it.cellIdentity
+//
+//                    val arfcn = cellIdentityNr.earfcn
+//                    val pci = cellIdentityNr.pci
+//                    val rsrp = strengthNr.rsrp
+//                    val rsrq = strengthNr.rsrq
+//                    val sinr = strengthNr.rssnr
+//                    val dbm = strengthNr.dbm
+//                    CellInfoModel(
+//                        arfcn = arfcn,
+//                        pci,
+//                        rsrq,
+//                        rsrp,
+//                        sinr,
+//                        dbm = dbm,
+//                    ).toMap()
+//                }
+//                else->{
+//                    // Impossible: 3g or 2g.
+//                    CellInfoModel(arfcn = 0, pci = 0, ssRsrp = 0, ssRsrq = 0, ssSnr = 0, dbm = 0).toMap()
+//                }
+//            }
+//        }
+        val mapList = getCellInfoMap(filters)
+        result.success(mapList)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun getCellInfoMap(cellInfoList: List<CellInfo>): List<Map<String, Any>> {
+        val mapList = cellInfoList.map {
+            when (it) {
+                is CellInfoNr -> {
+                    val strengthNr = it.cellSignalStrength as CellSignalStrengthNr
+                    val cellIdentityNr = it.cellIdentity as CellIdentityNr
+
+                    val arfcn = cellIdentityNr.nrarfcn
+                    val pci = cellIdentityNr.pci
+                    val rsrp = strengthNr.ssRsrp
+                    val rsrq = strengthNr.ssRsrq
+                    val sinr = strengthNr.ssSinr
+                    val csiRsrp = strengthNr.csiRsrp
+                    val csiRsrq = strengthNr.csiRsrq
+                    val csiSnr = strengthNr.csiSinr
+                    val dbm = strengthNr.dbm
+                    CellInfoModel(
+                        type = CellInfoType.Nr,
+                        isRegistered = it.isRegistered,
+                        arfcn = arfcn,
+                        pci,
+                        rsrq,
+                        rsrp,
+                        sinr,
+                        csiRsrp = csiRsrp,
+                        csiRsrq = csiRsrq,
+                        csiSinr = csiSnr,
+                        dbm = dbm
+                    ).toMap()
+                }
+
+                is CellInfoLte -> {
+                    val strengthNr = it.cellSignalStrength
+                    val cellIdentityNr = it.cellIdentity
+
+                    val arfcn = cellIdentityNr.earfcn
+                    val pci = cellIdentityNr.pci
+                    val rsrp = strengthNr.rsrp
+                    val rsrq = strengthNr.rsrq
+                    val sinr = strengthNr.rssnr
+                    val dbm = strengthNr.dbm
+                    CellInfoModel(
+                        type = CellInfoType.Lte,
+                        isRegistered = it.isRegistered,
+                        arfcn = arfcn,
+                        pci,
+                        rsrq,
+                        rsrp,
+                        sinr,
+                        dbm = dbm,
+                    ).toMap()
+                }
+
+                else -> {
+                    // Impossible: 3g or 2g.
+                    CellInfoModel(
+                        type = CellInfoType.Nr,
+                        isRegistered = false,
+                        arfcn = 0,
+                        pci = 0,
+                        ssRsrp = 0,
+                        ssRsrq = 0,
+                        ssSnr = 0,
+                        dbm = 0
+                    ).toMap()
+                }
+            }
+        }
+        return mapList
     }
 
     private fun startBackgroundService(result: Result) {

@@ -14,7 +14,7 @@ It uses `TelephonyManager.requestCellInfoUpdate()` to provide periodic, real-tim
 
 ```yaml
 dependencies:
-  cellular_info: ^1.0.0
+  cellular_info: ^1.0.2
 ```
 
 ## 🔧 Usage
