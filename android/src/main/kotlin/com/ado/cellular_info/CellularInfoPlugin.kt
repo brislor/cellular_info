@@ -222,7 +222,7 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
                     val filters = cellInfoList.filter { it is CellInfoNr }
 //                    val nrList = cellInfoList.filterIsInstance<CellInfoNr>()
                     if (filters.isEmpty()) {
-                        nrStreamEventSink?.error("NOT_FOUND", "No 5G NR cell info available", null)
+                        nrStreamEventSink?.error("GEt_NR_CELL_INFO_NOT_FOUND", "No 5G NR cell info available", null)
                         return
                     }
 //                    val mapList = filters.map {
@@ -284,7 +284,7 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
 
                 override fun onError(errorCode: Int, detail: Throwable?) {
                     nrStreamEventSink?.error(
-                        "GEt_CELL_INFO_ ERROR",
+                        "GEt_NR_CELL_INFO_ERROR",
                         "Code=$errorCode, message=${detail?.message}",
                         null
                     )
@@ -334,19 +334,19 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
                     val filters = cellInfoList.filter { it is CellInfoLte || it is CellInfoNr }
                     if (filters.isEmpty()) {
                         allCellInfoStreamEventSink?.error(
-                            "NOT_FOUND",
+                            "GEt_ALL_CELL_INFO_NOT_FOUND",
                             "No 5G NR Or LTE cell info available",
                             null
                         )
                         return
                     }
                     val mapList = getCellInfoMap(filters)
-                    nrStreamEventSink?.success(mapList)
+                    allCellInfoStreamEventSink?.success(mapList)
                 }
 
                 override fun onError(errorCode: Int, detail: Throwable?) {
                     allCellInfoStreamEventSink?.error(
-                        "GEt_CELL_INFO_ERROR",
+                        "GEt_ALL_CELL_INFO_NOT_ERROR",
                         "Code=$errorCode, message=${detail?.message}",
                         null
                     )

@@ -1,3 +1,6 @@
+## 1.0.3
+- bugfix: `getAllCellInfoStream()` can return right data.
+
 ## 1.0.2
 - Support Lte CellInfo via `getCellInfo()` or`getNrOrLteStream()`.
 - breaking change: `nrOrLteSignalStream()` change to `allCellInfoStream()`.

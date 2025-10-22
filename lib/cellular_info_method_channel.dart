@@ -47,11 +47,11 @@ class MethodChannelCellularInfo extends CellularInfoPlatform {
       final rawList = event as List<dynamic>;
       final signals = await Future.wait(rawList.map((e) async {
         var signalNr = SignalNr.fromJson(Map<String, dynamic>.from(e));
-        if (signalNr.arfcn != null) {
-          signalNr.freq = nrArfcnToFrequency(signalNr.arfcn!);
-          signalNr.band =
-              convert2Band(await getNrBandForArfcn(signalNr.arfcn!));
-        }
+        // if (signalNr.arfcn != null) {
+        //   signalNr.freq = nrArfcnToFrequency(signalNr.arfcn!);
+        //   signalNr.band =
+        //       convert2Band(await getNrBandForArfcn(signalNr.arfcn!));
+        // }
         return signalNr;
       }));
       return signals;
@@ -73,13 +73,14 @@ class MethodChannelCellularInfo extends CellularInfoPlatform {
         }
         return signalNr;
       }));
-      final filter = signals.where((e){
-        if(e.band != null){
-          return e.band!.contains("77")||e.band!.contains("78");
-        }
-        return false;
-      }).toList();
-      return filter;
+      // final filter = signals.where((e){
+      //   if(e.band != null){
+      //     return e.band!.contains("77")||e.band!.contains("78");
+      //   }
+      //   return false;
+      // }).toList();
+      // return filter;
+      return signals;
     }).handleError((error) {
       throw Exception("nrSignalStream error.....$error");
     });
@@ -95,13 +96,6 @@ class MethodChannelCellularInfo extends CellularInfoPlatform {
       throw Exception("nrSignalStreamFromService error.....$error");
     });
   }
-
-  // @override
-  // Stream<SignalNr> getSignalNr() async* {
-  //   yield* eventChannel.receiveBroadcastStream().map((event) {
-  //     return SignalNr.fromJson(Map<String, dynamic>.from(event as Map));
-  //   });
-  // }
 
   @override
   Future<void> startService() async {
