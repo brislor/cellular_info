@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer';
 
+import 'package:cellular_info/model/lte_band.dart';
 import 'package:cellular_info/model/nr_signal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -47,11 +48,17 @@ class MethodChannelCellularInfo extends CellularInfoPlatform {
       final rawList = event as List<dynamic>;
       final signals = await Future.wait(rawList.map((e) async {
         var signalNr = SignalNr.fromJson(Map<String, dynamic>.from(e));
-        // if (signalNr.arfcn != null) {
-        //   signalNr.freq = nrArfcnToFrequency(signalNr.arfcn!);
-        //   signalNr.band =
-        //       convert2Band(await getNrBandForArfcn(signalNr.arfcn!));
-        // }
+        if (signalNr.arfcn != null) {
+          if (signalNr.type == 0) {
+            signalNr.freq = nrArfcnToFrequency(signalNr.arfcn!);
+            signalNr.band =
+                convert2Band(await getNrBandForArfcn(signalNr.arfcn!));
+          } else if (signalNr.type == 1) {
+            final bandInfo = LteFrequencyConverter.getLteBandInfoFromEarfcn(signalNr.arfcn!);
+            signalNr.freq = bandInfo.dlFreq;
+            signalNr.band = "${bandInfo.band}";
+          }
+        }
         return signalNr;
       }));
       return signals;

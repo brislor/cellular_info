@@ -1,3 +1,6 @@
+## 1.0.4
+- bugfix: 4g EARFCN can return right data.
+
 ## 1.0.3
 - bugfix: `getAllCellInfoStream()` can return right data.
 
