@@ -10,10 +10,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.telephony.CellIdentityLte
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfo
 import android.telephony.CellInfoLte
 import android.telephony.CellInfoNr
+import android.telephony.CellSignalStrengthLte
 import android.telephony.CellSignalStrengthNr
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -133,6 +135,8 @@ class CellInfoService : Service() {
 
                     val arfcn = cellIdentityNr.nrarfcn
                     val pci = cellIdentityNr.pci
+                    val ci = cellIdentityNr.nci
+                    val tac = cellIdentityNr.tac
                     val rsrp = strengthNr.ssRsrp
                     val rsrq = strengthNr.ssRsrq
                     val sinr = strengthNr.ssSinr
@@ -145,6 +149,8 @@ class CellInfoService : Service() {
                         isRegistered = it.isRegistered,
                         arfcn = arfcn,
                         pci,
+                        ci,
+                        tac,
                         rsrq,
                         rsrp,
                         sinr,
@@ -155,11 +161,13 @@ class CellInfoService : Service() {
                     ).toMap()
                 }
                 is CellInfoLte ->{
-                    val strengthNr = it.cellSignalStrength
-                    val cellIdentityNr = it.cellIdentity
+                    val strengthNr = it.cellSignalStrength as CellSignalStrengthLte
+                    val cellIdentityNr = it.cellIdentity as CellIdentityLte
 
                     val arfcn = cellIdentityNr.earfcn
                     val pci = cellIdentityNr.pci
+                    val ci = cellIdentityNr.ci
+                    val tac = cellIdentityNr.tac
                     val rsrp = strengthNr.rsrp
                     val rsrq = strengthNr.rsrq
                     val sinr = strengthNr.rssnr
@@ -169,6 +177,8 @@ class CellInfoService : Service() {
                         isRegistered = it.isRegistered,
                         arfcn = arfcn,
                         pci,
+                        ci.toLong(),
+                        tac,
                         rsrq,
                         rsrp,
                         sinr,
@@ -177,7 +187,7 @@ class CellInfoService : Service() {
                 }
                 else->{
                     // Impossible: 3g or 2g.
-                    CellInfoModel(type = CellInfoType.Nr, isRegistered = false,arfcn = 0, pci = 0, ssRsrp = 0, ssRsrq = 0, ssSnr = 0, dbm = 0).toMap()
+                    CellInfoModel(type = CellInfoType.Nr, isRegistered = false,arfcn = 0, pci = 0, ci = 0, tac = 0, ssRsrp = 0, ssRsrq = 0, ssSnr = 0, dbm = 0).toMap()
                 }
             }
         }

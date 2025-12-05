@@ -1,3 +1,6 @@
+## 1.0.5
+- Feature: Add some parameters(ci,tac,eNB,LCID).
+
 ## 1.0.4
 - bugfix: 4g EARFCN can return right data.
 

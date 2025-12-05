@@ -8,10 +8,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.telephony.CellIdentityLte
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfo
 import android.telephony.CellInfoLte
 import android.telephony.CellInfoNr
+import android.telephony.CellSignalStrengthLte
 import android.telephony.CellSignalStrengthNr
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -492,6 +494,8 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
 
                     val arfcn = cellIdentityNr.nrarfcn
                     val pci = cellIdentityNr.pci
+                    val ci = cellIdentityNr.nci
+                    val tac = cellIdentityNr.tac
                     val rsrp = strengthNr.ssRsrp
                     val rsrq = strengthNr.ssRsrq
                     val sinr = strengthNr.ssSinr
@@ -504,6 +508,8 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
                         isRegistered = it.isRegistered,
                         arfcn = arfcn,
                         pci,
+                        ci,
+                        tac,
                         rsrq,
                         rsrp,
                         sinr,
@@ -515,20 +521,24 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 is CellInfoLte -> {
-                    val strengthNr = it.cellSignalStrength
-                    val cellIdentityNr = it.cellIdentity
+                    val strengthLte = it.cellSignalStrength as CellSignalStrengthLte
+                    val cellIdentityLte = it.cellIdentity as CellIdentityLte
 
-                    val arfcn = cellIdentityNr.earfcn
-                    val pci = cellIdentityNr.pci
-                    val rsrp = strengthNr.rsrp
-                    val rsrq = strengthNr.rsrq
-                    val sinr = strengthNr.rssnr
-                    val dbm = strengthNr.dbm
+                    val arfcn = cellIdentityLte.earfcn
+                    val pci = cellIdentityLte.pci
+                    val ci = cellIdentityLte.ci
+                    val tac = cellIdentityLte.tac
+                    val rsrp = strengthLte.rsrp
+                    val rsrq = strengthLte.rsrq
+                    val sinr = strengthLte.rssnr
+                    val dbm = strengthLte.dbm
                     CellInfoModel(
                         type = CellInfoType.Lte,
                         isRegistered = it.isRegistered,
                         arfcn = arfcn,
                         pci,
+                        ci.toLong(),
+                        tac,
                         rsrq,
                         rsrp,
                         sinr,
@@ -543,6 +553,8 @@ class CellularInfoPlugin : FlutterPlugin, MethodCallHandler {
                         isRegistered = false,
                         arfcn = 0,
                         pci = 0,
+                        ci = 0L,
+                        tac = 0,
                         ssRsrp = 0,
                         ssRsrq = 0,
                         ssSnr = 0,

@@ -6,6 +6,10 @@ class SignalNr {
   double? freq;
   int? arfcn;
   int? pci;
+  int? ci;
+  int? tac;
+  int? eNB;
+  int? lcid;
   int? csiRsrp;
   int? csiRsrq;
   int? csiSinr;
@@ -21,6 +25,10 @@ class SignalNr {
     this.freq,
     this.arfcn,
     this.pci,
+    this.ci,
+    this.tac,
+    this.eNB,
+    this.lcid,
     this.csiRsrp,
     this.csiRsrq,
     this.csiSinr,
@@ -37,6 +45,14 @@ class SignalNr {
     freq = json["freq"];
     arfcn = json["arfcn"];
     pci = json["pci"];
+    ci = json["ci"];
+    tac = json["tac"];
+
+    /// verify: https://www.cellmapper.net/enbid
+    /// eNB = ci / 256;
+    /// LCID = ci % 256;
+    eNB = ci != null ? ci! ~/ 256 : null;
+    lcid = ci != null ? ci! % 256 : null;
     csiRsrp = json['csiRsrp'];
     csiRsrq = json['csiRsrq'];
     csiSinr = json['csiSinr'];
@@ -54,7 +70,10 @@ class SignalNr {
     map['freq'] = freq;
     map['arfcn'] = arfcn;
     map["pci"] = pci;
-    map['csiRsrp'] = csiRsrp;
+    map["ci"] = ci;
+    map["tac"] = tac;
+    map['eNB'] = eNB;
+    map['lcid'] = lcid;
     map['csiRsrq'] = csiRsrq;
     map['csiSinr'] = csiSinr;
     map['ssRsrp'] = ssRsrp;
