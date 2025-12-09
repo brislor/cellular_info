@@ -1,3 +1,5 @@
+const unavailable = 0x7fffffff;
+
 class SignalNr {
   /// 0: 5g-NR,1: 4g-LTE.
   int type = 0;
@@ -43,23 +45,23 @@ class SignalNr {
     isRegistered = json["isRegistered"];
     band = json["band"];
     freq = json["freq"];
-    arfcn = json["arfcn"];
-    pci = json["pci"];
-    ci = json["ci"];
-    tac = json["tac"];
+    arfcn = _checkUnavailable(json["arfcn"]);
+    pci = _checkUnavailable(json["pci"]);
+    ci = _checkUnavailable(json["ci"]);
+    tac = _checkUnavailable(json["tac"]);
 
     /// verify: https://www.cellmapper.net/enbid
     /// eNB = ci / 256;
     /// LCID = ci % 256;
     eNB = ci != null ? ci! ~/ 256 : null;
     lcid = ci != null ? ci! % 256 : null;
-    csiRsrp = json['csiRsrp'];
-    csiRsrq = json['csiRsrq'];
-    csiSinr = json['csiSinr'];
-    ssRsrp = json['ssRsrp'];
-    ssRsrq = json['ssRsrq'];
-    ssSinr = json['ssSinr'];
-    dbm = json['dbm'];
+    csiRsrp = _checkUnavailable(json['csiRsrp']);
+    csiRsrq = _checkUnavailable(json['csiRsrq']);
+    csiSinr = _checkUnavailable(json['csiSinr']);
+    ssRsrp = _checkUnavailable(json['ssRsrp']);
+    ssRsrq = _checkUnavailable(json['ssRsrq']);
+    ssSinr = _checkUnavailable(json['ssSinr']);
+    dbm = _checkUnavailable(json['dbm']);
   }
 
   Map<String, dynamic> toJson() {
@@ -81,6 +83,10 @@ class SignalNr {
     map['ssSinr'] = ssSinr;
     map['dbm'] = dbm;
     return map;
+  }
+
+  int? _checkUnavailable(value) {
+    return value == null || value == unavailable ? null : value;
   }
 
   @override
